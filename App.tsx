@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { Dashboard } from './components/Dashboard';
+import { Login } from './components/Login'; // Import the new Login component
 import { AnalysisState, SavedReport, Account, AccountType } from './types';
 import { analyzeStatement } from './services/geminiService';
 import { fileToBase64 } from './utils/fileHelpers';
@@ -8,7 +9,10 @@ import { saveReport, getReports, deleteReport, getAccounts, createAccount, delet
 import { aggregateFinancialData } from './utils/analytics';
 
 const App: React.FC = () => {
-  const [activeView, setActiveView] = useState<'UNIFIED' | 'UPLOAD' | string>('UNIFIED'); // 'UNIFIED', 'UPLOAD', or accountId
+  // Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => !!sessionStorage.getItem('isAuthenticated'));
+
+  const [activeView, setActiveView] = useState<'UNIFIED' | 'UPLOAD' | string>('UNIFIED'); 
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [allReports, setAllReports] = useState<SavedReport[]>([]);
   
@@ -18,10 +22,23 @@ const App: React.FC = () => {
     data: null,
   });
 
-  // Load initial data
+  // Load initial data only if authenticated
   useEffect(() => {
-    refreshData();
-  }, []);
+    if (isAuthenticated) {
+      refreshData();
+    }
+  }, [isAuthenticated]);
+
+  const handleLoginSuccess = () => {
+    sessionStorage.setItem('isAuthenticated', 'true');
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('isAuthenticated');
+    setIsAuthenticated(false);
+    setActiveView('UNIFIED'); // Reset view on logout
+  };
 
   const refreshData = () => {
     setAccounts(getAccounts());
@@ -37,7 +54,7 @@ const App: React.FC = () => {
       if (isNewAccount && newAccountName && newAccountType) {
         const newAccount = createAccount(newAccountName, newAccountType);
         targetAccountId = newAccount.id;
-        setAccounts(getAccounts()); // Update local state
+        setAccounts(getAccounts()); 
       }
 
       const base64Pdf = await fileToBase64(file);
@@ -49,7 +66,7 @@ const App: React.FC = () => {
       setAnalysisState({
         isLoading: false,
         error: null,
-        data: null, // Reset because we will redirect to dashboard
+        data: null, 
       });
       
       setActiveView(targetAccountId);
@@ -77,17 +94,14 @@ const App: React.FC = () => {
     }
   };
 
-  // Determine what data to show based on activeView
   const getCurrentData = () => {
     if (activeView === 'UNIFIED') {
       return aggregateFinancialData(allReports, accounts);
     } else if (activeView === 'UPLOAD') {
       return null;
     } else {
-      // Specific Account View
       const accountReports = allReports.filter(r => r.accountId === activeView);
       const data = aggregateFinancialData(accountReports, accounts);
-      // Customize period label
       data.statementPeriod = accounts.find(a => a.id === activeView)?.name || 'Account View';
       return data;
     }
@@ -95,6 +109,12 @@ const App: React.FC = () => {
 
   const currentDashboardData = getCurrentData();
 
+  // If not authenticated, show the Login component
+  if (!isAuthenticated) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  // Otherwise, render the main application
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
       {/* Sidebar */}
@@ -156,17 +176,26 @@ const App: React.FC = () => {
           </button>
         </nav>
         
-        <div className="p-4 border-t border-slate-200">
+        <div className="p-4 border-t border-slate-200 space-y-3">
            <div className="bg-indigo-900 rounded-xl p-4 text-white relative overflow-hidden">
               <div className="absolute top-0 right-0 -mt-2 -mr-2 w-12 h-12 bg-indigo-500 rounded-full opacity-50 blur-lg"></div>
               <p className="text-xs text-indigo-200 font-medium mb-1">Total Net Savings</p>
               <p className="text-xl font-bold">
-                 {/* Quick Calc for Sidebar */}
                  {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(
                     aggregateFinancialData(allReports, accounts).summary.netSavings
                  )}
               </p>
            </div>
+           
+           <button
+             onClick={handleLogout}
+             className="w-full flex items-center justify-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors text-slate-500 hover:bg-slate-100 hover:text-rose-600"
+           >
+             <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+             </svg>
+             Logout
+           </button>
         </div>
       </aside>
 
@@ -211,7 +240,6 @@ const App: React.FC = () => {
             <>
               {currentDashboardData && (
                 <div className="max-w-7xl mx-auto">
-                   {/* Top Actions Bar for Account View */}
                    {activeView !== 'UNIFIED' && activeView !== 'UPLOAD' && (
                      <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
                         <div className="flex items-center gap-3">
@@ -232,7 +260,6 @@ const App: React.FC = () => {
                      </div>
                    )}
 
-                   {/* Statement History List (Only for specific accounts) */}
                    {activeView !== 'UNIFIED' && (
                      <div className="mb-8">
                         <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Statement History</h3>
@@ -256,7 +283,6 @@ const App: React.FC = () => {
                      </div>
                    )}
 
-                   {/* Dashboard Component */}
                    <Dashboard 
                      data={currentDashboardData} 
                      onBack={() => setActiveView('UNIFIED')} 
