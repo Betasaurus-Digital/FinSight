@@ -1,0 +1,5 @@
+{
+  "name": "FinSight - AI Statement Analyzer",
+  "description": "Upload your bank or credit card PDF statements to instantly categorize transactions, visualize spending habits, and identify opportunities for savings using Gemini AI.",
+  "requestFramePermissions": []
+}
