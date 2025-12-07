@@ -1,3 +1,4 @@
+
 export enum TransactionType {
   INCOME = 'INCOME',
   EXPENSE = 'EXPENSE'
@@ -59,7 +60,31 @@ export interface SavedReport {
   data: FinancialAnalysis;
 }
 
+export interface SavedCard {
+  id: string;
+  bankName: string;
+  cardName?: string; // e.g. "Regalia Gold", "Sapphire Reserve"
+  network: string; // Visa, Mastercard, Rupay, Amex
+  cardType: string; // Credit, Debit
+  last4: string;
+  colorStart: string;
+  colorEnd: string;
+}
+
+export interface BankOffer {
+  id: string;
+  bank: string;
+  platform: string; // Amazon, Flipkart, Swiggy, etc.
+  logoUrl?: string;
+  title: string;
+  description: string;
+  code?: string;
+  category: string; // Shopping, Food, Travel
+  validTill?: string;
+}
+
 export interface AppData {
   accounts: Account[];
   reports: SavedReport[];
+  savedCards: SavedCard[];
 }

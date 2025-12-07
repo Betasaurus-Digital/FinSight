@@ -14,7 +14,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (id === CORRECT_ID && password === CORRECT_PASS) {
+    if (id.trim() === CORRECT_ID && password.trim() === CORRECT_PASS) {
       setError('');
       onLoginSuccess();
     } else {

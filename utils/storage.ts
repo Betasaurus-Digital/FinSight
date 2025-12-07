@@ -1,4 +1,4 @@
-import { SavedReport, FinancialAnalysis, Account, AccountType, AppData } from '../types';
+import { SavedReport, FinancialAnalysis, Account, AccountType, AppData, SavedCard } from '../types';
 
 const STORAGE_KEY = 'finsight_data_v2';
 
@@ -6,14 +6,17 @@ const getAppData = (): AppData => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      // Migration: Ensure savedCards exists
+      if (!parsed.savedCards) parsed.savedCards = [];
+      return parsed;
     }
   } catch (e) {
     console.error('Failed to load data', e);
   }
   
   // Migration or fallback
-  return { accounts: [], reports: [] };
+  return { accounts: [], reports: [], savedCards: [] };
 };
 
 const saveAppData = (data: AppData) => {
@@ -80,5 +83,25 @@ export const deleteAccount = (id: string) => {
   data.accounts = data.accounts.filter(a => a.id !== id);
   // Also delete associated reports
   data.reports = data.reports.filter(r => r.accountId !== id);
+  saveAppData(data);
+};
+
+// --- Card Storage Methods ---
+
+export const getSavedCards = (): SavedCard[] => {
+  return getAppData().savedCards || [];
+};
+
+export const saveCard = (card: SavedCard) => {
+  const data = getAppData();
+  if (!data.savedCards) data.savedCards = [];
+  data.savedCards.push(card);
+  saveAppData(data);
+};
+
+export const deleteCard = (id: string) => {
+  const data = getAppData();
+  if (!data.savedCards) return;
+  data.savedCards = data.savedCards.filter(c => c.id !== id);
   saveAppData(data);
 };

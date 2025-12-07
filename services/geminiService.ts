@@ -1,5 +1,6 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
-import { FinancialAnalysis, Transaction, TransactionType } from '../types';
+import { FinancialAnalysis, Transaction, TransactionType, BankOffer } from '../types';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -140,5 +141,94 @@ export const analyzeStatement = async (base64Pdf: string): Promise<FinancialAnal
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
     throw new Error("Failed to analyze the document. Please ensure it is a clear PDF statement.");
+  }
+};
+
+export const fetchBankOffers = async (query: string, page: number = 1): Promise<BankOffer[]> => {
+  const modelId = "gemini-2.5-flash";
+  
+  // Page logic: subtle prompt engineering to ask for "more" or "different" results
+  const batchInstruction = page > 1 
+    ? `(Batch #${page}: Try to find DIFFERENT or ADDITIONAL offers than the usual top results)`
+    : `(Batch #${page})`;
+
+  const prompt = `
+    Use Google Search to find ACTIVE and CURRENT credit card and bank offers for: "${query}".
+    ${batchInstruction}
+    
+    Return a list of 12 distinct relevant offers.
+    
+    Format the output as a JSON array of objects with the following keys:
+    - id (generate a random string)
+    - bank (Bank Name, e.g., HDFC, Chase)
+    - platform (Merchant/Platform, e.g., Amazon, Flipkart, Zomato, Indigo, Agoda)
+    - title (Short catchy title, e.g. "Flat 10% Off", "Buy 1 Get 1")
+    - description (Details of the discount/cashback)
+    - code (Promo code if available, else null)
+    - category (Classify strictly into: 'Groceries', 'Electronics', 'Fuel', 'Flights', 'Hotels', 'Dining Apps', 'Fashion', 'Entertainment', 'Utility Bills', 'Cabs/Travel', 'Other')
+    - validTill (Expiry date if available, else null)
+
+    Strictly return ONLY the JSON array. Do not add markdown code blocks.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: modelId,
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }] 
+      }
+    });
+
+    const text = response.text || '';
+    
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]) as BankOffer[];
+    } else {
+      console.warn("Could not parse JSON from search result", text);
+      return [];
+    }
+  } catch (error) {
+    console.error("Fetch Offers Error:", error);
+    return [];
+  }
+};
+
+export const findCreditCards = async (query: string): Promise<Array<{name: string, bank: string, network: string}>> => {
+  const modelId = "gemini-2.5-flash";
+  
+  const prompt = `
+    Use Google Search to find real credit cards matching the query: "${query}".
+    Find 3-5 specific card models.
+    
+    Return a JSON array of objects:
+    - name (Full card name, e.g., "HDFC Regalia Gold", "Chase Sapphire Preferred")
+    - bank (Bank name, e.g., "HDFC Bank", "Chase")
+    - network (Visa, Mastercard, Amex, Rupay - make a best guess if unknown)
+
+    Strictly return ONLY the JSON array.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: modelId,
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }] 
+      }
+    });
+
+    const text = response.text || '';
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    } else {
+      return [];
+    }
+  } catch (error) {
+    console.error("Find Cards Error:", error);
+    return [];
   }
 };
